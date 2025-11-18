@@ -1,4 +1,5 @@
 package com.nintecdo.games.tiktaktoe;
 
-public class GameStatus {
+public enum GameState {
+    IN_PROGRESS, X_WINS, O_WINS, DRAW
 }

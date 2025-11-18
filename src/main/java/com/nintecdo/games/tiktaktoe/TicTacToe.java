@@ -1,5 +1,6 @@
 package com.nintecdo.games.tiktaktoe;
 
+import com.nintecdo.core.GameStats;
 import com.nintecdo.core.IGame;
 import com.nintecdo.core.IGameListener;
 import javafx.application.Platform;
@@ -9,6 +10,8 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -46,9 +49,10 @@ public class TicTacToe implements IGame {
         board.reset();
         startTime = LocalDateTime.now();
         gameActive = true;
+        stats.put("score", 0);
         stats.put("moves", 0);
         stats.put("winner", null);
-        stats.put("startTime", startTime);
+        stats.put("startTime", Instant.now());
         updateUI();
     }
 
@@ -158,10 +162,34 @@ public class TicTacToe implements IGame {
     }
 
     private void notifyGameEnded() {
+        System.out.println("Tic Tac Toe has ended");
+
+        stats.put(
+                "score",
+                calculateScore(
+                        (Integer) stats.get("moves"),
+                        Duration.between((Instant) stats.get("startTime"), Instant.now()).toMillis()
+                )
+        );
+
+        GameStats finalStats = new GameStats();
+        finalStats.setGameName(getName());
+        finalStats.setStats(getStats());
+        finalStats.setTimestamp(LocalDateTime.now());
+
         Platform.runLater(() -> {
             for (IGameListener listener : listeners) {
-                listener.onGameEnded(this);
+                listener.onGameFinished(finalStats);
             }
         });
+    }
+
+    private Double calculateScore(Integer moves, Long timeMs) {
+        // Convert time to seconds for readability
+        double timeSeconds = timeMs / 1000.0;
+
+        // Base score: 100 points
+        // Penalty: 5 points per move, 1 point per second
+        return Math.max(0, 100 - (moves * 5) - (timeSeconds * 1));
     }
 }

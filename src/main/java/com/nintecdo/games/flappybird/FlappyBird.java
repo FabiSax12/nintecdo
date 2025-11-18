@@ -1,4 +1,4 @@
-package com.games.flappybird;
+package com.nintecdo.games.flappybird;
 
 import com.nintecdo.core.IGame;
 import com.nintecdo.core.IGameListener;
@@ -27,6 +27,7 @@ public class FlappyBird implements IGame {
 
     @Override
     public void start() {
+        System.out.println("Starting FlappyBird");
         running = true;
         startTime = System.currentTimeMillis();
         gamePanel.startGame();

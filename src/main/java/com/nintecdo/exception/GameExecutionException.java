@@ -1,7 +1,14 @@
 package com.nintecdo.exception;
 
-public class GameExcecutionException extends RuntimeException {
-  public GameExcecutionException(String message) {
-    super(message);
-  }
+/**
+ * Se lanza cuando hay error durante la ejecución de un juego.
+ * Casos de uso:
+ * - El juego se cuelga
+ * - Error en I/O durante la partida
+ * - Falta de recursos
+ */
+public class GameExecutionException extends Exception {
+    public GameExecutionException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }

@@ -1,4 +1,8 @@
-package com.nintecdo.api;
+package com.nintecdo.core;
+
+import javafx.scene.layout.Pane;
+
+import java.util.Map;
 
 public interface IGame {
     void start();
@@ -6,6 +10,8 @@ public interface IGame {
     String getName();
     String getVersion();
     Map<String, Object> getStats();
-    void addGameListener(GameListener listener);
-    void removeGameListener(GameListener listener);
+    void addGameListener(IGameListener listener);
+    void removeGameListener(IGameListener listener);
+
+    Pane getGamePanel();
 }

@@ -1,5 +1,10 @@
 package com.nintecdo;
 
+import com.nintecdo.exception.GameLoadException;
+import com.nintecdo.loader.GameLoader;
+import com.nintecdo.ui.MainWindow;
+import javafx.application.Application;
+
 /**
  * Hello world!
  *
@@ -8,6 +13,6 @@ public class App
 {
     public static void main( String[] args )
     {
-        System.out.println( "Hello World!" );
+        Application.launch(MainWindow.class, args);
     }
 }

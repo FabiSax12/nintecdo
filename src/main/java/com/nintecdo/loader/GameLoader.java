@@ -1,7 +1,8 @@
-package com.nintecdo.manager;
+package com.nintecdo.loader;
 
 import com.nintecdo.core.IGame;
 import com.nintecdo.exception.GameLoadException;
+import com.nintecdo.manager.GameManager;
 
 import java.io.File;
 import java.net.URL;
@@ -66,11 +67,13 @@ public class GameLoader {
             }
 
             // 5. Instanciar la clase
-            IGame game = (IGame) gameClass
-                    .getDeclaredConstructor()
-                    .newInstance();
+//            IGame game = (IGame) gameClass
+//                    .getDeclaredConstructor()
+//                    .newInstance();
+//            IGame game = (IGame) (Simpleton) gameClass.getInstance();
+            java.lang.reflect.Method getInstance = gameClass.getDeclaredMethod("getInstance");
 
-            return game;
+            return (IGame) getInstance.invoke(null);
 
         } catch (ClassNotFoundException e) {
             throw new GameLoadException(
