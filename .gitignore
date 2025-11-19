@@ -5,6 +5,7 @@ target/
 .kotlin
 
 plugins
+stats.db
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
