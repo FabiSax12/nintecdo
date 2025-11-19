@@ -3,34 +3,104 @@ package com.nintecdo.loader;
 import com.nintecdo.core.IGame;
 import com.nintecdo.exception.GameLoadException;
 import com.nintecdo.manager.GameManager;
+import com.nintecdo.persistence.StatsRepository;
 
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.sql.SQLException;
+import java.util.Map;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.io.InputStream;
+import java.util.Properties;
 
 public class GameLoader {
     private static final String PLUGINS_DIR = "./plugins";
     private static final String GAME_CLASS_MANIFEST_KEY = "Game-Class";
 
-    public static void loadAllGames() throws GameLoadException {
-        File pluginsDir = new File(PLUGINS_DIR);
-        if (!pluginsDir.exists()) {
-            pluginsDir.mkdirs();
-        }
+    // En GameLoader.java
+    public static void loadAllGames(StatsRepository statsRepository)
+            throws GameLoadException {
+        try {
+            Map<String, String> savedGames = statsRepository.getAllGamesWithPaths();
 
-        File[] jars = pluginsDir.listFiles((d, n) -> n.endsWith(".jar"));
-        if (jars == null) return;
-
-        for (File jar : jars) {
-            try {
-                IGame game = loadGameFromJar(jar);
-                GameManager.getInstance().registerGame(game.getName(), game);
-            } catch (Exception e) {
-                System.err.println("Error cargando " + jar.getName() + ": " + e);
+            if (savedGames.isEmpty()) {
+                System.out.println("No hay juegos guardados en la base de datos.");
+                return;
             }
+
+            System.out.println("Cargando " + savedGames.size() + " juegos guardados...");
+
+            for (Map.Entry<String, String> entry : savedGames.entrySet()) {
+                String gameName = entry.getKey();
+                String filePath = entry.getValue();
+
+                System.out.println("Cargando " + gameName + " desde " + filePath);
+
+                File jarFile = new File(filePath);
+
+                if (jarFile.exists()) {
+                    try {
+                        // Cargar sin volver a guardar en DB (ya existe)
+                        loadGameFromPath(jarFile);
+                        System.out.println("✓ " + gameName + " cargado");
+                    } catch (Exception e) {
+                        System.err.println("✗ Error cargando " + gameName +
+                                ": " + e.getMessage());
+                    }
+                } else {
+                    System.err.println("✗ Archivo no encontrado: " + filePath);
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new GameLoadException(
+                    "Error leyendo juegos de la base de datos: " + e.getMessage(),
+                    e
+            );
         }
+    }
+
+    // Método auxiliar sin guardar en DB
+    private static void loadGameFromPath(File jarFile) throws Exception {
+        URLClassLoader classLoader = new URLClassLoader(
+                new URL[]{jarFile.toURI().toURL()},
+                GameLoader.class.getClassLoader()
+        );
+
+        InputStream manifestStream = classLoader.getResourceAsStream(
+                "manifest.properties"
+        );
+
+        if (manifestStream == null) {
+            throw new Exception("No se encontró manifest.properties");
+        }
+
+        Properties props = new Properties();
+        props.load(manifestStream);
+
+        String gameClass = props.getProperty("game.class");
+        String gameName = props.getProperty("game.title");
+
+        Class<?> clazz = classLoader.loadClass(gameClass);
+        IGame gameInstance = null;
+
+        // INTENTAR CARGAR COMO SINGLETON
+        try {
+            java.lang.reflect.Method getInstanceMethod =
+                    clazz.getMethod("getInstance");
+            gameInstance = (IGame) getInstanceMethod.invoke(null);
+            System.out.println("✓ Juego cargado como Singleton");
+        } catch (NoSuchMethodException e) {
+            // NO ES SINGLETON, instanciar normalmente
+            gameInstance = (IGame) clazz.getDeclaredConstructor().newInstance();
+            System.out.println("✓ Juego cargado con constructor público");
+        }
+
+        GameManager.getInstance().registerGame(gameName, gameInstance);
     }
 
     private static IGame loadGameFromJar(File jar)
@@ -92,6 +162,81 @@ public class GameLoader {
             throw new GameLoadException(
                     "Error cargando " + jar.getName() + ": " +
                             e.getClass().getSimpleName() + " - " + e.getMessage(), e
+            );
+        }
+    }
+
+    // En GameLoader.java
+    public static void loadGame(File jarFile, StatsRepository statsRepository) throws GameLoadException {
+        if (!jarFile.exists() || !jarFile.getName().endsWith(".jar")) {
+            throw new GameLoadException(
+                    "El archivo no es un JAR válido: " + jarFile.getName()
+            );
+        }
+
+        try {
+            // Cargar el JAR dinámicamente
+            URLClassLoader classLoader = new URLClassLoader(
+                    new URL[]{jarFile.toURI().toURL()},
+                    GameLoader.class.getClassLoader()
+            );
+
+            // Leer manifest.properties del JAR
+            InputStream manifestStream = classLoader.getResourceAsStream(
+                    "manifest.properties"
+            );
+
+            if (manifestStream == null) {
+                throw new GameLoadException(
+                        "No se encontró manifest.properties en " + jarFile.getName()
+                );
+            }
+
+            Properties props = new Properties();
+            props.load(manifestStream);
+
+            String gameClass = props.getProperty("game.class");
+            String gameName = props.getProperty("game.title");
+
+            if (gameClass == null || gameName == null) {
+                throw new GameLoadException(
+                        "Manifest incompleto en " + jarFile.getName()
+                );
+            }
+
+            Class<?> clazz = classLoader.loadClass(gameClass);
+            IGame gameInstance = null;
+
+            // INTENTAR CARGAR COMO SINGLETON
+            try {
+                java.lang.reflect.Method getInstanceMethod =
+                        clazz.getMethod("getInstance");
+                gameInstance = (IGame) getInstanceMethod.invoke(null);
+                System.out.println("✓ Juego cargado como Singleton");
+            } catch (NoSuchMethodException e) {
+                // NO ES SINGLETON, instanciar normalmente
+                gameInstance = (IGame) clazz.getDeclaredConstructor().newInstance();
+                System.out.println("✓ Juego cargado con constructor público");
+            }
+
+            GameManager.getInstance().registerGame(gameName, gameInstance);
+
+            // GUARDAR EN BASE DE DATOS
+            try {
+                statsRepository.addGame(gameName, jarFile.getAbsolutePath());
+            } catch (SQLException e) {
+                // Si ya existe, ignorar el error (UNIQUE constraint)
+                if (!e.getMessage().contains("UNIQUE constraint")) {
+                    throw e;
+                }
+            }
+
+            System.out.println("✓ Juego cargado: " + gameName);
+
+        } catch (Exception e) {
+            throw new GameLoadException(
+                    "Error cargando " + jarFile.getName() + ": " + e.getMessage(),
+                    e
             );
         }
     }

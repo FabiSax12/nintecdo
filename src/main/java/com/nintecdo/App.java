@@ -1,7 +1,5 @@
 package com.nintecdo;
 
-import com.nintecdo.exception.GameLoadException;
-import com.nintecdo.loader.GameLoader;
 import com.nintecdo.ui.MainWindow;
 import javafx.application.Application;
 

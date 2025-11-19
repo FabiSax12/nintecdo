@@ -17,8 +17,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -32,6 +34,7 @@ public class MainWindow extends Application implements IGameListener {
     private StatusLabel statsLabel;
     private ComboBox<String> gameSelector;
     private Button playBtn;
+    private Button loadGameBtn;
     private Button rankingsBtn;
     private StatsRepository statsRepository;
 
@@ -45,7 +48,7 @@ public class MainWindow extends Application implements IGameListener {
         GameManager.getInstance().addGameListener(this);
 
         try {
-            GameLoader.loadAllGames();
+            GameLoader.loadAllGames(statsRepository);
         } catch (GameLoadException e) {
             System.err.println("Error cargando juegos: " + e.getMessage());
             e.printStackTrace();
@@ -106,6 +109,12 @@ public class MainWindow extends Application implements IGameListener {
             );
         }
 
+        // Boton Cargar Juego
+        loadGameBtn = new Button("Cargar Juego");
+        loadGameBtn.setPrefWidth(100);
+        loadGameBtn.setStyle("-fx-font-size: 12; -fx-padding: 8;");
+        loadGameBtn.setOnAction(e -> loadGameFromDisk());
+
         // Botón Jugar
         playBtn = new Button("▶ Jugar");
         playBtn.setPrefWidth(100);
@@ -125,6 +134,7 @@ public class MainWindow extends Application implements IGameListener {
         controlPanel.getChildren().addAll(
                 selectLabel,
                 gameSelector,
+                loadGameBtn,
                 playBtn,
                 spacer,
                 rankingsBtn
@@ -378,5 +388,75 @@ public class MainWindow extends Application implements IGameListener {
                 );
             }
         });
+    }
+
+    private void loadGameFromDisk() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Seleccionar Juego (.jar)");
+
+        // Filtro para archivos JAR
+        FileChooser.ExtensionFilter jarFilter =
+                new FileChooser.ExtensionFilter("Archivos JAR (*.jar)", "*.jar");
+        fileChooser.getExtensionFilters().add(jarFilter);
+
+        // Directorio inicial (opcional)
+        File userHome = new File(System.getProperty("user.home"));
+        if (userHome.exists()) {
+            fileChooser.setInitialDirectory(userHome);
+        }
+
+        // Mostrar diálogo
+        File selectedFile = fileChooser.showOpenDialog(
+                gameSelector.getScene().getWindow()
+        );
+
+        if (selectedFile != null) {
+            try {
+                updateStatus(
+                        "Cargando " + selectedFile.getName() + "...",
+                        StatusLabel.Status.LOADING
+                );
+
+                // Cargar el juego desde el archivo
+                GameLoader.loadGame(selectedFile, statsRepository);
+
+                // Actualizar el selector con la nueva lista de juegos
+                List<String> availableGames =
+                        GameManager.getInstance().getAvailableGames();
+
+                gameSelector.setItems(
+                        FXCollections.observableArrayList(availableGames)
+                );
+
+                // Seleccionar el último juego cargado (el más reciente)
+                if (!availableGames.isEmpty()) {
+                    String lastGame = availableGames.get(availableGames.size() - 1);
+                    gameSelector.setValue(lastGame);
+                }
+
+                updateStatus(
+                        "✓ Juego cargado correctamente: " + selectedFile.getName(),
+                        StatusLabel.Status.SUCCESS
+                );
+
+            } catch (GameLoadException e) {
+                updateStatus(
+                        "Error cargando juego: " + e.getMessage(),
+                        StatusLabel.Status.ERROR
+                );
+                e.printStackTrace();
+            } catch (Exception e) {
+                updateStatus(
+                        "Error inesperado: " + e.getMessage(),
+                        StatusLabel.Status.ERROR
+                );
+                e.printStackTrace();
+            }
+        } else {
+            updateStatus(
+                    "Carga de juego cancelada",
+                    StatusLabel.Status.WAITING_GAME
+            );
+        }
     }
 }

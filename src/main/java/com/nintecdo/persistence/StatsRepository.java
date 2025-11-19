@@ -29,7 +29,8 @@ public class StatsRepository {
 
             stmt.execute("CREATE TABLE IF NOT EXISTS games (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "name TEXT UNIQUE NOT NULL)");
+                    "name TEXT UNIQUE NOT NULL," +
+                    "file_path TEXT NOT NULL)");
 
             stmt.execute("CREATE TABLE IF NOT EXISTS stats (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -40,6 +41,48 @@ public class StatsRepository {
 
             System.out.println("✓ Base de datos inicializada: " + DB_URL);
         }
+    }
+
+    public void addGame(String gameName, String filePath) throws SQLException {
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+
+            String sql = "INSERT INTO games (name, file_path) VALUES (?, ?)";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, gameName);
+                pstmt.setString(2, filePath);
+                pstmt.executeUpdate();
+
+                System.out.println("✓ Juego Guardado: " + gameName + " - Path: " + filePath);
+            }
+
+        }
+    }
+
+    /**
+     * Obtiene todos los juegos con sus rutas de archivo.
+     *
+     * @return mapa: nombre del juego → ruta del archivo
+     * @throws SQLException si hay error en la base de datos
+     */
+    public Map<String, String> getAllGamesWithPaths() throws SQLException {
+        Map<String, String> games = new HashMap<>();
+
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+
+            String sql = "SELECT name, file_path FROM games ORDER BY name";
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+
+                while (rs.next()) {
+                    games.put(
+                            rs.getString("name"),
+                            rs.getString("file_path")
+                    );
+                }
+            }
+        }
+
+        return games;
     }
 
     /**
@@ -56,7 +99,7 @@ public class StatsRepository {
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
 
             // 1. Obtener o crear el juego
-            int gameId = getOrCreateGame(conn, gameName);
+            int gameId = getOrCreateGame(conn, gameName, "");
 
             // 2. Extraer el score
             Object scoreObj = stats.get("score");
@@ -352,7 +395,7 @@ public class StatsRepository {
      * @return ID del juego
      * @throws SQLException si hay error en la base de datos
      */
-    private int getOrCreateGame(Connection conn, String gameName)
+    private int getOrCreateGame(Connection conn, String gameName, String filePath)
             throws SQLException {
 
         // Intentar obtener el juego
@@ -367,12 +410,14 @@ public class StatsRepository {
         }
 
         // Si no existe, crear
-        String insertSql = "INSERT INTO games (name) VALUES (?)";
+        String insertSql = "INSERT INTO games (name, file_path) VALUES (?, ?)";
         try (PreparedStatement pstmt = conn.prepareStatement(
                 insertSql,
-                Statement.RETURN_GENERATED_KEYS)) {
+                Statement.RETURN_GENERATED_KEYS)
+        ) {
 
             pstmt.setString(1, gameName);
+            pstmt.setString(2, filePath);
             pstmt.executeUpdate();
 
             try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
