@@ -166,7 +166,6 @@ public class GameLoader {
         }
     }
 
-    // En GameLoader.java
     public static void loadGame(File jarFile, StatsRepository statsRepository) throws GameLoadException {
         if (!jarFile.exists() || !jarFile.getName().endsWith(".jar")) {
             throw new GameLoadException(
